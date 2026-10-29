@@ -29,6 +29,14 @@ The build copies the production files to `dist/`, with a content-derived service
 - Local scenario storage (up to 30), reload persistence and shareable scenario URLs. Shared links contain the entered model names and values in the URL fragment. Shared links are portable when hosted on an accessible URL.
 - Local fonts and app icons, install manifest and service-worker precache. Once “Offline bereit” appears, the app can be reloaded and used without the server/network. Updates wait until all app windows close.
 
+## Calculator modes and saved scenarios
+
+Basic hides Adept, Sharp, Unblockable, Tough, Pierce, Armour, shared Melee Prowess and its priority, initiative traits, Durable, Kata, damage dice selection and special abilities. Hidden values stay in the complete profiles but are neutralized in the derived calculation input. Advanced restores them. Mode is preserved in saved scenarios, reload persistence and share links. Additional Critical and the separate Reach eligibility control are no longer shown; enable Reach only when it applies.
+
+Average and lower-median wounds are uncapped in both Melee and Ranged. The HP rings switch between those summaries; they show damage versus remaining HP, not outcome probabilities. The out-of-action percentage and HP-loss plots remain based on actual remaining HP. Swap exchanges both complete profiles while keeping the active side fixed.
+
+Scenarios support save, load and delete, including names, hidden traits, mode and conditions, for up to 30 saved matchups per browser. They persist offline and across reloads. There is no account or device synchronization. Share links transfer a complete scenario to another browser, but local saved scenarios do not automatically migrate from localhost to the deployment domain.
+
 ## Rules and agreed interpretations
 
 Checked 2026-10-29 against:

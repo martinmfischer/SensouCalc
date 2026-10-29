@@ -54,6 +54,7 @@ test('Screenshot comparison: ordered dice reproduce ranged damage with and witho
     counts.forEach((count,wounds)=>close(result.damage[wounds],count/46656));
     close(result.mean,(hp===6?cappedMeans:rawMeans)[range-4]);
     close(result.meanWounds,rawMeans[range-4]);
+    close(result.medianWounds,[6,5,4][range-4]);
     close(result.meanWounds,manualModifier.meanWounds);
   }
 });
