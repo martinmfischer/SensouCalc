@@ -102,7 +102,7 @@ export function poolDistribution(options={}) {
   return result;
 }
 
-export const defaultModel = (name='Model') => ({name,hp:6,attack:3,defence:1,ranged:3,strength:0,brutal:0,parry:0,adeptAttack:0,adeptDefence:0,prowessAttack:0,prowessDefence:0,prowessMelee:0,rerollGoal:'balanced',feint:0,dodge:0,unblockable:0,impenetrable:false,kata:false,reach:false,reachEligible:true,lightning:false,slow:false,armour:0,pierce:0,tough:0,sharp:0,durable:false,critical:false,power:'normal',special:'normal',size:'small'});
+export const defaultModel = (name='Model') => ({name,hp:6,attack:3,defence:1,ranged:3,strength:0,brutal:0,parry:0,adeptAttack:0,adeptDefence:0,prowessAttack:0,prowessDefence:0,prowessMelee:0,rerollGoal:'balanced',feint:0,dodge:0,unblockable:0,impenetrable:false,kata:false,reach:false,reachEligible:true,lightning:false,slow:false,armour:0,pierce:0,tough:0,sharp:0,durable:false,lastStand:false,critical:false,power:'normal',special:'normal',size:'small'});
 const numberLimits={hp:[1,30],attack:[0,8],defence:[0,8],ranged:[1,8],strength:[-6,6],brutal:[0,5],parry:[0,5],adeptAttack:[0,6],adeptDefence:[0,6],prowessAttack:[0,3],prowessDefence:[0,3],prowessMelee:[0,3],feint:[0,3],dodge:[0,3],unblockable:[0,5],armour:[0,6],pierce:[0,6],tough:[-3,6],sharp:[0,6]};
 export function normalizeModel(input={}) {
   const result=defaultModel();
@@ -111,7 +111,7 @@ export function normalizeModel(input={}) {
     const value=Number(input[key]);
     result[key]=Number.isFinite(value) ? clamp(Math.round(value),min,max) : result[key];
   }
-  for (const key of ['impenetrable','kata','reach','reachEligible','lightning','slow','durable','critical']) if (typeof input[key]==='boolean') result[key]=input[key];
+  for (const key of ['impenetrable','kata','reach','reachEligible','lightning','slow','durable','lastStand','critical']) if (typeof input[key]==='boolean') result[key]=input[key];
   for (const [key,allowed] of Object.entries({power:['normal','strong','weak','assassin'],special:['normal','combo','dual','critical','half','knockdown','counterstrike'],size:['tiny','small','medium','large','huge'],rerollGoal:['balanced','attack','defence']})) if (allowed.includes(input[key])) result[key]=input[key];
   return result;
 }
@@ -165,7 +165,7 @@ export function damageOutcomes(sl,attacker,defender) {
     }
     const next=new Map();
     for (const previous of result) {
-      if (previous.removed||previous.wounds===cap) {add(next,`${previous.wounds}:${previous.removed?1:0}`,previous.p);continue;}
+      if (previous.removed||previous.wounds===cap&&!defender.lastStand) {add(next,`${previous.wounds}:${previous.removed?1:0}`,previous.p);continue;}
       for (const [key,p] of hit) {
         const [wounds,removed]=key.split(':').map(Number);
         add(next,`${Math.min(cap,previous.wounds+wounds)}:${removed}`,previous.p*p);
@@ -286,7 +286,7 @@ export function melee(input) {
       // Keep their correlation so a lethal first roll cancels the second event.
       const metric=results[one.source],hp=models[1-one.source].hp;
       for(const before of one.uncapped){
-        const survives=!before.removed&&before.wounds<hp;
+        const survives=!before.removed&&(before.wounds<hp||models[1-one.source].lastStand);
         const after=survives?two.uncapped:[{wounds:0,removed:false,p:1}];
         for(const end of after){
           const weight=p*before.p*end.p,wounds=before.wounds+end.wounds;
@@ -297,7 +297,7 @@ export function melee(input) {
       }
     }else{
       record(one,p);
-      const survives=!one?1:one.prone?0:one.outcomes.filter(o=>!o.removed&&o.wounds<models[1-one.source].hp).reduce((sum,o)=>sum+o.p,0);
+      const survives=!one?1:one.prone?0:one.outcomes.filter(o=>!o.removed&&(o.wounds<models[1-one.source].hp||models[1-one.source].lastStand)).reduce((sum,o)=>sum+o.p,0);
       record(two,p*survives);
     }
   }

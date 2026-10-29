@@ -1,0 +1,3 @@
+# Replace the publisher ID with the exact entry supplied by your AdSense account.
+# Publish as /ads.txt only after completing AdSense activation.
+google.com, pub-YOUR_16_DIGIT_PUBLISHER_ID, DIRECT, f08c47fec0942fa0

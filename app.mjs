@@ -1,29 +1,19 @@
-import {defaultModel,normalizeModel} from './src/engine.mjs';
-import {ADVANCED_FIELDS,calculationInput} from './src/scenario.mjs';
+import {normalizeModel} from './src/engine.mjs';
+import {csvCell} from './src/export.mjs';
+import {createCalculator} from './src/calculator.mjs';
+import {initAdSlot} from './src/ads.mjs';
+import {ADVANCED_FIELDS,calculationInput,defaults,sanitize,parseScenario,parseSharedHash} from './src/scenario.mjs';
 
 const $=selector=>document.querySelector(selector);
 const escape=value=>String(value).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const pct=value=>new Intl.NumberFormat('en-GB',{style:'percent',maximumFractionDigits:1}).format(Math.max(0,Math.min(1,value)));
 const pointPct=value=>new Intl.NumberFormat('en-GB',{style:'percent',maximumFractionDigits:2}).format(Math.max(0,Math.min(1,value)));
 const decimal=value=>new Intl.NumberFormat('en-GB',{maximumFractionDigits:2,minimumFractionDigits:2}).format(value);
-const defaults=()=>({version:1,advanced:true,mode:'melee',active:0,a:defaultModel('Model A'),b:defaultModel('Model B'),friendly:defaultModel('Friendly model'),range:4,challengeModifier:0,rangedDefence:0,inBtb:false,conditions:{}});
-function sanitize(value) {
-  if (!value || typeof value!=='object') throw new Error('Invalid scenario');
-  const result=defaults();
-  result.advanced=value.advanced!==false;result.mode=value.mode==='ranged'?'ranged':'melee';result.active=value.active===1?1:0;
-  const legacyNames={'Modell A':'Model A','Modell B':'Model B','Befreundetes Modell':'Friendly model'};
-  for (const key of ['a','b','friendly']) {result[key]=normalizeModel(value[key]||result[key]);result[key].name=legacyNames[result[key].name]||result[key].name;result[key].critical=false;result[key].reachEligible=true;}
-  result.range=[4,5,6].includes(Number(value.range))?Number(value.range):4;
-  for (const key of ['challengeModifier','rangedDefence']) result[key]=Math.max(-6,Math.min(6,Math.round(Number(value[key])||0)));
-  result.inBtb=value.inBtb===true;
-  for (const key of ['cover','moved','ran','prone','surprised','repeated','shooterBtb']) result.conditions[key]=value.conditions?.[key]===true;
-  return result;
-}
-let state=defaults(),result=null,plot='cumulative',damageView='median',threshold=3,job=0,timer,installPrompt=null;
+let state=defaults(),result=null,plot='cumulative',damageView='median',threshold=3,installPrompt=null;
 try {
-  const hash=location.hash.slice(1);
-  if (hash.startsWith('s=')) state=sanitize(JSON.parse(decodeURIComponent(hash.slice(2))));
-  else {const stored=localStorage.getItem('sensou-calc-state');if(stored) state=sanitize(JSON.parse(stored));}
+  const shared=parseSharedHash(location.hash);
+  if(shared)state=shared;
+  else {const stored=localStorage.getItem('sensou-calc-state');if(stored)state=parseScenario(stored);}
 } catch {setTimeout(()=>toast('Could not load the saved scenario.'),0);}
 function persist() {
   try {localStorage.setItem('sensou-calc-state',JSON.stringify(state));}
@@ -50,14 +40,14 @@ const icons={
 function abilityIcon(name,group=false) {
   return icons[name]?`<svg class="ability-icon${group?' group-icon':''} icon-${name}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">${icons[name]}</svg>`:'';
 }
-const fieldTones={attack:'attack',ranged:'attack',strength:'attack',brutal:'attack',pierce:'attack',sharp:'attack',unblockable:'attack',adeptAttack:'attack',critical:'attack',power:'attack',special:'attack',defence:'defence',armour:'defence',tough:'defence',parry:'defence',adeptDefence:'defence',durable:'defence',impenetrable:'defence',prowessAttack:'reroll',prowessDefence:'reroll',prowessMelee:'reroll',feint:'reroll',dodge:'reroll',kata:'reroll',rerollGoal:'reroll'};
+const fieldTones={attack:'attack',ranged:'attack',strength:'attack',brutal:'attack',pierce:'attack',sharp:'attack',unblockable:'attack',adeptAttack:'attack',critical:'attack',power:'attack',special:'attack',defence:'defence',armour:'defence',tough:'defence',parry:'defence',adeptDefence:'defence',durable:'defence',lastStand:'defence',impenetrable:'defence',prowessAttack:'reroll',prowessDefence:'reroll',prowessMelee:'reroll',feint:'reroll',dodge:'reroll',kata:'reroll',rerollGoal:'reroll'};
 function numberField(side,key,label,min=0,max=8,hint='') {
   if(!state.advanced&&ADVANCED_FIELDS.has(key))return '';
   return `<label class="field" data-tone="${fieldTones[key]||'neutral'}" data-valued="${state[side][key]!==0}" ${hint?`title="${escape(hint)}"`:''}><span>${label}${hint?' <span class="hint-dot" aria-hidden="true">?</span>':''}</span><span class="stepper"><button type="button" data-step="-1" aria-label="${escape(label)} decrease">−</button><input aria-label="${escape(side+' '+label)}" type="number" inputmode="numeric" min="${min}" max="${max}" step="1" data-side="${side}" data-key="${key}" value="${state[side][key]}"><button type="button" data-step="1" aria-label="${escape(label)} increase">+</button></span></label>`;
 }
 function toggle(side,key,label,hint='') {
   if(!state.advanced&&ADVANCED_FIELDS.has(key))return '';
-  const symbol=({critical:'critical',kata:'kata',durable:'durable',lightning:'initiative',reach:'reach',slow:'slow'})[key];
+  const symbol=({critical:'critical',kata:'kata',durable:'durable',lastStand:'defence',lightning:'initiative',reach:'reach',slow:'slow'})[key];
   return `<label class="toggle" data-tone="${fieldTones[key]||'neutral'}" ${hint?`title="${escape(hint)}"`:''}><span class="toggle-label">${abilityIcon(symbol)}<span>${label}</span></span><input type="checkbox" data-side="${side}" data-key="${key}" ${state[side][key]?'checked':''}><span class="switch" aria-hidden="true"></span></label>`;
 }
 function select(side,key,label,items) {
@@ -79,7 +69,7 @@ function modelCard(side,index,role,targetOnly=false) {
   const coreFields=melee?numberField(side,'attack','Attack Pool',0,8)+numberField(side,'defence','Defence Pool')+numberField(side,'hp','Remaining HP',1,30):targetOnly?numberField(side,'hp','Remaining HP',1,30)+select(side,'size','Model size',sizes):numberField(side,'ranged','Ranged Pool',1,8)+numberField(side,'strength','Strength',-6,6);
   const core=`<div class="core-fields${melee?'':' ranged-core'}">${coreFields}</div>`;
   const attackTraits=targetOnly?'':traitSection('Attack & damage',`<div class="field-grid">${melee?numberField(side,'strength','Strength',-6,6):''}${numberField(side,'brutal','Brutal',0,5)}${numberField(side,'adeptAttack',melee?'Adept [Attack]':'Adept [Ranged]',0,6)}${numberField(side,'pierce','Pierce',0,6)}${numberField(side,'sharp','Sharp',0,6)}${melee?numberField(side,'unblockable','Unblockable',0,5):''}</div><div class="select-grid">${select(side,'power','Damage dice',powers)}${select(side,'special','Special ability',melee?specials:specials.filter(([value])=>value!=='counterstrike'))}</div><div class="toggle-grid">${melee?toggle(side,'kata','Kata','Keep natural ones in melee.'):''}</div>`);
-  const defensive=!melee&&!targetOnly?'':traitSection('Defence & resilience',`<div class="field-grid">${numberField(side,'armour','Armour',0,6)}${numberField(side,'tough','Tough',-3,6)}${melee?numberField(side,'parry','Parry',0,5)+numberField(side,'adeptDefence','Adept [Defence]',0,6):''}</div><div class="toggle-grid">${toggle(side,'durable','Durable','At most one wound per damage roll, after Tough and halving.')}${melee?toggle(side,'impenetrable','Impenetrable Def.','Removes the opponent’s highest attack die.'):''}</div>`);
+  const defensive=!melee&&!targetOnly?'':traitSection('Defence & resilience',`<div class="field-grid">${numberField(side,'armour','Armour',0,6)}${numberField(side,'tough','Tough',-3,6)}${melee?numberField(side,'parry','Parry',0,5)+numberField(side,'adeptDefence','Adept [Defence]',0,6):''}</div><div class="toggle-grid">${toggle(side,'durable','Durable','At most one wound per damage roll, after Tough and halving.')}${toggle(side,'lastStand','Last Stand','Lethal wounds allow a counterattack; Critical removal and Prone still interrupt it.')}${melee?toggle(side,'impenetrable','Impenetrable Def.','Removes the opponent’s highest attack die.'):''}</div>`);
   const rerolls=targetOnly?'':traitSection('Rerolls',`<div class="field-grid">${numberField(side,'prowessAttack',melee?'Prowess [Attack]':'Prowess [Ranged]',0,3)}${melee?numberField(side,'prowessDefence','Prowess [Defence]',0,3)+numberField(side,'prowessMelee','Prowess [Melee]',0,3,'Shared budget, replaces separate Prowess; at most 8 dice in total.')+numberField(side,'feint','Feint',0,3)+numberField(side,'dodge','Dodge',0,3):''}</div>${melee?select(side,'rerollGoal','Shared Prowess priority',[['balanced','Balanced · Attack + Defence'],['attack','Attack first'],['defence','Defence first']]):''}`);
   const initiative=melee?traitSection('Initiative',`<div class="toggle-grid">${toggle(side,'lightning','Lightning Reflexes')}${toggle(side,'slow','Slow')}${toggle(side,'reach','Reach','Enable when eligible: outside BtB with every enemy at activation start.')}</div>`):'';
   return `<article class="model-card panel ${index===1?'model-b':''}" data-card="${side}"><div class="model-top"><span class="model-index">${String(index+1).padStart(2,'0')}</span><span>${role}</span>${melee?`<button class="active-chip ${state.active===index?'is-active':''}" data-active="${index}" aria-pressed="${state.active===index}">${state.active===index?'Active Player':'Set active'}</button>`:`<span class="model-chip">${targetOnly?'TARGET':'ATTACKER'}</span>`}</div><label class="model-name"><span class="sr-only">Name ${side}</span><input type="text" maxlength="60" data-side="${side}" data-key="name" aria-label="Name ${side}" value="${escape(m.name)}"></label>${core}${attackTraits}${defensive}${rerolls}${initiative}</article>`;
@@ -95,23 +85,25 @@ function renderModels() {
   document.querySelectorAll('[data-mode]').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.mode===state.mode)));
   $('#conditions').innerHTML=state.mode==='melee'?'<p class="input-footnote">Enter allocated dice after costs, states, assists and boosts.</p>':rangedConditions();
 }
-const worker=new Worker('./src/worker.mjs',{type:'module'});
-function calculate() {
-  clearTimeout(timer);
-  const current=++job;
-  $('.results').setAttribute('aria-busy','true');$('#chart').setAttribute('aria-busy','true');
-  $('#calculation-state').textContent='Calculating…';
-  $('#export-button').disabled=true;
-  timer=setTimeout(()=>worker.postMessage({id:current,state:calculationInput(state)}),100);
+function setBusy(busy){
+  $('.results').setAttribute('aria-busy',String(busy));$('.results').inert=busy;
+  $('.chart-panel').setAttribute('aria-busy',String(busy));$('.chart-panel').inert=busy;
+  $('#chart').setAttribute('aria-busy',String(busy));$('#export-button').disabled=busy;
 }
-worker.onmessage=({data})=>{
-  if(data.id!==job)return;
-  $('.results').setAttribute('aria-busy','false');$('#chart').setAttribute('aria-busy','false');
-  if(data.error){result=null;$('#calculation-state').textContent='Check inputs';$('#result-content').innerHTML=`<div class="panel error"><h2>This scenario needs an adjustment.</h2><p>${escape(data.error)}</p></div>`;$('#chart').innerHTML='';$('#data-table').innerHTML='';$('#threshold-results').innerHTML='';return;}
-  result=data.result;$('#calculation-state').textContent='Exact calculation';$('#export-button').disabled=false;
-  renderResults();renderChart();
-};
-worker.onerror=()=>{$('#calculation-state').textContent='Calculation failed';$('.results').setAttribute('aria-busy','false');$('#result-content').innerHTML='<div class="panel error">The calculation worker could not start. Please reload the app.</div>';};
+function calculationError(message){
+  result=null;setBusy(false);$('#export-button').disabled=true;
+  $('#calculation-state').textContent='Check inputs';
+  $('#result-content').innerHTML='<div class="panel error"><h2>Calculation unavailable</h2><p>'+escape(message)+'</p></div>';
+  for(const selector of ['#chart','#data-table','#threshold-results'])$(selector).innerHTML='';
+}
+const calculator=createCalculator({
+  onResult:value=>{result=value;setBusy(false);$('#calculation-state').textContent='Exact calculation';renderResults();renderChart();},
+  onError:calculationError
+});
+function calculate(){
+  result=null;hideChartTooltip();setBusy(true);$('#calculation-state').textContent='Calculating…';
+  calculator.calculate(calculationInput(state));
+}
 function legendNames(){return state.mode==='melee'?[state.a.name,state.b.name]:['Short','Medium','Long'];}
 function damageViewSwitch(){
   return '<div class="damage-view-switch" role="group" aria-label="Damage summary"><span>Damage / HP</span>'+['average','median'].map(view=>'<button data-damage-view="'+view+'" aria-pressed="'+(damageView===view)+'">'+(view==='average'?'Average':'Median')+'</button>').join('')+'</div>';
@@ -126,18 +118,20 @@ function renderRangedResults() {
   const bands=result.bands,names=legendNames();
   const row=(label,value,kind='')=>'<tr class="'+kind+'"><th scope="row">'+label+'</th>'+bands.map(b=>'<td>'+value(b)+'</td>').join('')+'</tr>';
   const friendly=state.inBtb?'<div class="friendly-result">Friendly fire after a hit: <strong>'+pct(1-result.selection)+'</strong></div>':'';
-  $('#result-content').innerHTML='<div class="panel ranged-outlook">'+friendly+'<div class="range-table-wrap"><table class="range-table"><caption class="sr-only">Compare Short, Medium and Long range</caption><thead><tr><th scope="col">Range</th>'+bands.map((b,i)=>'<th scope="col" class="range-'+i+'">'+names[i]+'<small>Challenge '+b.challenge+'</small></th>').join('')+'</tr></thead><tbody>'+row('Target hit',b=>pct(b.results[0].hit))+row('At least 1 wound',b=>pct(b.results[0].wound))+row('Average wounds',b=>decimal(b.results[0].meanWounds),'range-emphasis')+row('Median wounds',b=>b.results[0].medianWounds)+row('Out of action',b=>pct(b.results[0].kill),'range-emphasis')+(result.models[0].special==='critical'?row('Critical removal',b=>pct(b.results[0].removed)):'')+(state.inBtb?row('Friendly fire',b=>pct(b.results[1].hit),'friendly-risk'):'')+'</tbody></table></div>'+damageViewSwitch()+'<div class="damage-summaries ranged-summaries">'+bands.map((b,i)=>damageSummary(b.results[0],state.b.hp,names[i])).join('')+'</div><p class="range-note">Average and median are uncapped, including misses. HP diagrams are summaries, not probabilities. Target: '+state.b.hp+' HP.</p></div><p class="result-method"><button class="inline-button" data-method>Reroll strategy & rules ↗</button></p>';
+  $('#result-content').innerHTML='<div class="panel ranged-outlook">'+friendly+'<div class="range-table-wrap"><table class="range-table"><caption class="sr-only">Compare Short, Medium and Long range</caption><thead><tr><th scope="col">Range</th>'+bands.map((b,i)=>'<th scope="col" class="range-'+i+'">'+names[i]+'<small>Challenge '+b.challenge+'</small></th>').join('')+'</tr></thead><tbody>'+row('Target hit',b=>pct(b.results[0].hit))+row('At least 1 wound',b=>pct(b.results[0].wound))+row('Average wounds',b=>decimal(b.results[0].meanWounds),'range-emphasis')+row('Median wounds',b=>b.results[0].medianWounds)+row(result.models[1].lastStand?'Removed by turn end':'Out of action',b=>pct(b.results[0].kill),'range-emphasis')+(result.models[0].special==='critical'?row('Critical removal',b=>pct(b.results[0].removed)):'')+(state.inBtb?row('Friendly fire',b=>pct(b.results[1].hit),'friendly-risk'):'')+'</tbody></table></div>'+damageViewSwitch()+'<div class="damage-summaries ranged-summaries">'+bands.map((b,i)=>damageSummary(b.results[0],state.b.hp,names[i])).join('')+'</div><p class="range-note">Average and median are uncapped, including misses. HP diagrams are summaries, not probabilities. Target: '+state.b.hp+' HP.</p></div><p class="result-method"><button class="inline-button" data-method>Reroll strategy & rules ↗</button></p>';
   $('#challenge-badge').textContent=bands.map(b=>b.challenge).join(' / ');
 }
 function renderResults() {
+  if(!result)return;
   if(state.mode==='ranged'){renderRangedResults();return;}
   const first=result.models[result.first];
   $('#result-content').innerHTML='<div class="outlook-panel panel"><div class="initiative-banner"><strong>'+escape(first.name)+'</strong><span> attacks first</span></div>'+damageViewSwitch()+'<div class="melee-summaries">'+result.results.map((metric,i)=>{
     const source=result.models[i],target=result.models[1-i];
-    return '<section class="side-summary"><h2>'+escape(source.name)+' <span>→ '+escape(target.name)+'</span></h2>'+damageSummary(metric,target.hp,'Damage to '+target.name)+'<dl class="damage-metrics"><div><dt>Average wounds</dt><dd>'+decimal(metric.meanWounds)+'</dd></div><div><dt>Median wounds</dt><dd>'+metric.medianWounds+'</dd></div><div><dt>At least 1 wound</dt><dd>'+pct(metric.wound)+'</dd></div><div><dt>Out of action</dt><dd>'+pct(metric.kill)+'</dd></div>'+(source.special==='critical'?'<div><dt>Critical removal</dt><dd>'+pct(metric.removed)+'</dd></div>':'')+'</dl></section>';
+    return '<section class="side-summary"><h2>'+escape(source.name)+' <span>→ '+escape(target.name)+'</span></h2>'+damageSummary(metric,target.hp,'Damage to '+target.name)+'<dl class="damage-metrics"><div><dt>Average wounds</dt><dd>'+decimal(metric.meanWounds)+'</dd></div><div><dt>Median wounds</dt><dd>'+metric.medianWounds+'</dd></div><div><dt>At least 1 wound</dt><dd>'+pct(metric.wound)+'</dd></div><div><dt>'+(target.lastStand?'Removed by turn end':'Out of action')+'</dt><dd>'+pct(metric.kill)+'</dd></div>'+(source.special==='critical'?'<div><dt>Critical removal</dt><dd>'+pct(metric.removed)+'</dd></div>':'')+'</dl></section>';
   }).join('')+'</div><p class="range-note">Average and median are uncapped, including cancelled attacks. HP diagrams are summaries, not probabilities.</p></div><p class="result-method"><button class="inline-button" data-method>Reroll strategy & rules ↗</button></p>';
 }
 function chartSeries() {
+  if(!result)return [];
   const results=state.mode==='ranged'?result.bands.map(b=>b.results[0]):result.results;
   return results.map(r=>plot==='success'?r.success:plot==='distribution'?r.damage:r.damage.map((_,n)=>r.damage.slice(n).reduce((a,b)=>a+b,0)));
 }
@@ -295,10 +289,9 @@ $('#scenario-list').onclick=event=>{
 };
 $('#export-button').onclick=()=>{
   if(!result)return;const series=chartSeries(),names=legendNames();
-  const cell=s=>'"'+String(s).replaceAll('"','""')+'"';
   const rows=[['Chart',plot],['Mode',state.mode],['Threshold',...names.slice(0,series.length)],...Array.from({length:Math.max(...series.map(s=>s.length))},(_,n)=>[n,...series.map(s=>s[n]||0)])];
   // Quoted, prefixed names prevent spreadsheet formula injection.
-  const csv='\uFEFF'+rows.map(row=>row.map(v=>cell(typeof v==='string'&&/^[=+@\-]/.test(v)?"'"+v:v)).join(';')).join('\r\n');
+  const csv='\uFEFF'+rows.map(row=>row.map(csvCell).join(';')).join('\r\n');
   const url=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'}));const a=document.createElement('a');a.href=url;a.download=`sensou-${state.mode}-${plot}.csv`;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
 };
 window.addEventListener('beforeinstallprompt',event=>{event.preventDefault();installPrompt=event;});
@@ -315,3 +308,12 @@ window.addEventListener('online',()=>{offlineStatus(Boolean(navigator.serviceWor
 $('#sl-limit-note').textContent='The shortcut extends the Wound Table beyond SL 10: Damage Roll 2 → max(0, SL − 3); 3 → max(0, SL − 2); 4–5 → max(0, SL − 1); 6–8 → SL; 9–10 → SL + 1; 11 → SL + 2; 12 → SL + 3. This extension is explicitly agreed for this app.';
 $('.results').append($('.chart-panel'));
 renderModels();syncTraitControls();calculate();
+
+initAdSlot();
+
+window.addEventListener('hashchange',()=>{
+  try{
+    const shared=parseSharedHash(location.hash);if(!shared)return;
+    state=shared;persist();renderModels();syncTraitControls();calculate();
+  }catch{toast('Could not load the shared scenario.');}
+});
