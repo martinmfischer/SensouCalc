@@ -90,7 +90,7 @@ function rangedConditions() {
 }
 function renderModels() {
   document.querySelectorAll('[data-complexity]').forEach(button=>button.setAttribute('aria-pressed',String((button.dataset.complexity==='advanced')===state.advanced)));
-  $('#models').innerHTML=modelCard('a',0,state.mode==='melee'?'MODEL A':'SHOOTER')+modelCard('b',1,state.mode==='melee'?'MODEL B':'ORIGINAL TARGET',state.mode==='ranged')+'<button type="button" class="swap-profiles" id="swap-profiles" aria-label="Swap complete profiles" title="Swap complete profiles; the active side stays in place">⇄</button>';
+  $('#models').innerHTML=modelCard('a',0,state.mode==='melee'?'MODEL A':'SHOOTER')+'<button type="button" class="swap-profiles" id="swap-profiles" aria-label="Swap complete profiles" title="Swap complete profiles; the active side stays in place">⇄</button>'+modelCard('b',1,state.mode==='melee'?'MODEL B':'ORIGINAL TARGET',state.mode==='ranged');
   $('#matchup-context').textContent=state.mode==='melee'?'One complete melee exchange':'One ranged attack, with optional friendly fire';
   document.querySelectorAll('[data-mode]').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.mode===state.mode)));
   $('#conditions').innerHTML=state.mode==='melee'?'<p class="input-footnote">Enter allocated dice after costs, states, assists and boosts.</p>':rangedConditions();

@@ -19,6 +19,12 @@ node scripts/build.mjs
 
 The build copies the production files to `dist/`, with a content-derived service-worker cache version. Serve `dist/` through any static HTTPS host. There is no compilation or package installation step. For Android/iOS installation from a phone, deploy to HTTPS; the desktop's loopback URL is not reachable from the phone. Native App Store / Play Store packages are not included in this version.
 
+## Deployment
+
+Live: https://sensoucalc.the-zj.workers.dev/ — Cloudflare Worker `sensoucalc`, static assets only. No Supabase, server-side database or runtime secrets are needed. SensouTrack was inspected via its public bundle: React/Vite with a Supabase client. It remains a separate application.
+
+`wrangler.jsonc` declares the static `dist/` directory and runs the build before deployment. With Cloudflare Wrangler installed and authenticated, run `npx wrangler deploy`. Alternatively build locally, zip the contents of `dist/` (with `index.html` at the archive root), and upload through the Cloudflare dashboard → sensoucalc → New deployment. The initial release was uploaded through the dashboard; Git auto-deployment is not connected. Never commit credentials or API tokens.
+
 ## Features
 
 - Complete two-way Melee Exchange: independently allocated Attack/Defence pools, total surviving-dice tiebreaks, active-player tiebreak, initiative and lethal interruption of the second attack.
