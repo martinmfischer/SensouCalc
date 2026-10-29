@@ -21,9 +21,9 @@ The build copies the production files to `dist/`, with a content-derived service
 
 ## Deployment
 
-Live: https://sensoucalc.the-zj.workers.dev/ — Cloudflare Worker `sensoucalc`, static assets only. No Supabase, server-side database or runtime secrets are needed. SensouTrack was inspected via its public bundle: React/Vite with a Supabase client. It remains a separate application.
+Primary URL: https://sensoucalc.pages.dev/ — Cloudflare Pages, static assets only. The earlier https://sensoucalc.the-zj.workers.dev/ deployment remains available and has its own browser storage. Saved scenarios are origin-specific; use Share links to transfer individual scenarios between domains. No Supabase, server-side database or runtime secrets are needed.
 
-`wrangler.jsonc` declares the static `dist/` directory and runs the build before deployment. With Cloudflare Wrangler installed and authenticated, run `npx wrangler deploy`. Alternatively build locally, zip the contents of `dist/` (with `index.html` at the archive root), and upload through the Cloudflare dashboard → sensoucalc → New deployment. The initial release was uploaded through the dashboard; Git auto-deployment is not connected. Never commit credentials or API tokens.
+Build with `node scripts/build.mjs`. With Cloudflare Wrangler installed and authenticated, deploy using `npx wrangler pages deploy dist --project-name sensoucalc`. `wrangler.jsonc` declares Pages output. Alternatively zip the contents of `dist/` (including `_headers` and with `index.html` at the archive root), then upload to Cloudflare Pages → sensoucalc → Create deployment. Git auto-deployment is not connected. The legacy Worker configuration is retained as `wrangler.worker.jsonc`; build and use `npx wrangler deploy --config wrangler.worker.jsonc` to update that endpoint. Never commit credentials or API tokens.
 
 ## Features
 
