@@ -112,7 +112,7 @@ export function normalizeModel(input={}) {
     result[key]=Number.isFinite(value) ? clamp(Math.round(value),min,max) : result[key];
   }
   for (const key of ['impenetrable','kata','reach','reachEligible','lightning','slow','durable','critical']) if (typeof input[key]==='boolean') result[key]=input[key];
-  for (const [key,allowed] of Object.entries({power:['normal','strong','weak','assassin'],special:['normal','combo','dual','critical','half','knockdown'],size:['tiny','small','medium','large','huge'],rerollGoal:['balanced','attack','defence']})) if (allowed.includes(input[key])) result[key]=input[key];
+  for (const [key,allowed] of Object.entries({power:['normal','strong','weak','assassin'],special:['normal','combo','dual','critical','half','knockdown','counterstrike'],size:['tiny','small','medium','large','huge'],rerollGoal:['balanced','attack','defence']})) if (allowed.includes(input[key])) result[key]=input[key];
   return result;
 }
 
@@ -231,13 +231,10 @@ function sharedProwess(model,attackOptions,defenceOptions,first) {
   }
   return [...output].map(([k,p])=>{const [attack,defence,count]=k.split(':').map(Number);return {attack,defence,count,p};});
 }
-const maxAttack=m=>m.attack ? 6+Math.min(m.attack-1,2+m.adeptAttack)+m.brutal : 0;
-const metrics=(hp,maxSL)=>({hit:0,kill:0,removed:0,meanWounds:0,damage:Array(hp+1).fill(0),success:Array(maxSL+1).fill(0)});
-function uncappedMean(sl,attacker,defender) {
-  return damageOutcomes(sl,attacker,{...defender,hp:Infinity}).reduce((s,o)=>s+o.wounds*o.p,0);
-}
-function recordDamage(metric,outcomes,weight,meanWounds) {
-  metric.meanWounds+=weight*meanWounds;
+const maxAttack=m=>Math.max(m.attack ? 6+Math.min(m.attack-1,2+m.adeptAttack)+m.brutal : 0,m.special==='counterstrike'&&m.defence ? 4+Math.min(m.defence-1,2+m.adeptDefence)+m.parry : 0);
+const metrics=(hp,maxSL)=>({hit:0,kill:0,removed:0,wounds:[],damage:Array(hp+1).fill(0),success:Array(maxSL+1).fill(0)});
+function recordDamage(metric,outcomes,weight,uncapped) {
+  for (const outcome of uncapped) metric.wounds[outcome.wounds]=(metric.wounds[outcome.wounds]||0)+weight*outcome.p;
   for (const outcome of outcomes) {
     const p=weight*outcome.p;
     metric.damage[outcome.wounds]+=p;
@@ -246,7 +243,13 @@ function recordDamage(metric,outcomes,weight,meanWounds) {
   }
 }
 function finish(m) {
-  return {...m,mean:m.damage.reduce((s,p,n)=>s+p*n,0),wound:1-m.damage[0]};
+  // Fill missing probability with misses/cancelled attacks in either distribution.
+  m.damage[0]+=Math.max(0,1-sum(m.damage));
+  m.wounds[0]=(m.wounds[0]||0)+Math.max(0,1-sum(m.wounds));
+  m.wounds=Array.from({length:m.wounds.length},(_,n)=>m.wounds[n]||0);
+  let cumulative=0,medianWounds=0;
+  for(let n=0;n<m.wounds.length;n++){cumulative+=m.wounds[n];if(cumulative>=0.5-1e-12){medianWounds=n;break;}}
+  return {...m,mean:m.damage.reduce((s,p,n)=>s+p*n,0),meanWounds:m.wounds.reduce((s,p,n)=>s+p*n,0),medianWounds,wound:1-m.damage[0]};
 }
 export function melee(input) {
   const models=[normalizeModel(input.a),normalizeModel(input.b)];
@@ -254,28 +257,49 @@ export function melee(input) {
   const first=initiative(...models,active), second=1-first;
   const states=models.map((m,i)=>sideStates(m,models[1-i],i===first));
   const results=models.map((m,i)=>metrics(models[1-i].hp,maxAttack(m)));
-  const damage=models.map((m,i)=>Array.from({length:maxAttack(m)+1},(_,sl)=>damageOutcomes(sl,m,models[1-i])));
-  const potential=models.map((m,i)=>Array.from({length:maxAttack(m)+1},(_,sl)=>uncappedMean(sl,m,models[1-i])));
-  function success(i,s,t) {
-    const mine=s[i], enemy=t;
-    const hit=models[i].attack>0 && (mine.attack>enemy.defence || (mine.attack===enemy.defence && (mine.count>enemy.count || (mine.count===enemy.count && active===i))));
-    return hit ? Math.max(0,mine.attack-enemy.defence) : -1;
+  const cache=new Map();
+  function event(attacker,s) {
+    const defender=1-attacker,mine=s[attacker],enemy=s[defender];
+    // Allocation matters even when every Attack die rolled a natural one.
+    if(!models[attacker].attack)return null;
+    const won=mine.attack>enemy.defence||(mine.attack===enemy.defence&&(mine.count>enemy.count||mine.count===enemy.count&&active===attacker));
+    const counterstrike=!won&&models[defender].special==='counterstrike'&&models[defender].defence>0&&enemy.defence-mine.attack>=2;
+    if(!won&&!counterstrike)return null;
+    const source=won?attacker:defender,sl=won?mine.attack-enemy.defence:enemy.defence-mine.attack-2;
+    const key=`${source}:${counterstrike}:${sl}`;
+    if(!cache.has(key)){
+      const profile=counterstrike?{...models[source],special:'normal',critical:false}:models[source];
+      cache.set(key,{source,sl,counterstrike,prone:won&&profile.special==='knockdown',outcomes:damageOutcomes(sl,profile,models[1-source]),uncapped:damageOutcomes(sl,profile,{...models[1-source],hp:Infinity})});
+    }
+    return cache.get(key);
+  }
+  function record(e,weight){
+    if(!e||!weight)return;
+    const metric=results[e.source];metric.hit+=weight;metric.success[e.sl]+=weight;
+    recordDamage(metric,e.outcomes,weight,e.uncapped);
   }
   for (const a of states[0]) for (const b of states[1]) {
     const s=[a,b],p=a.p*b.p;
-    const levels=[success(0,s,b),success(1,s,a)];
-    const firstSL=levels[first];
-    const firstDamage=firstSL<0 ? [{wounds:0,removed:false,p:1}] : damage[first][firstSL];
-    if (firstSL>=0) {results[first].hit+=p;results[first].success[firstSL]+=p;}
-    recordDamage(results[first],firstDamage,p,firstSL<0?0:potential[first][firstSL]);
-    const stops=firstSL>=0 && models[first].special==='knockdown';
-    const survives=stops ? 0 : firstDamage.filter(o=>!o.removed&&o.wounds<models[second].hp).reduce((s,o)=>s+o.p,0);
-    const secondSL=levels[second];
-    results[second].damage[0]+=p*(1-survives);
-    if (secondSL>=0) {
-      results[second].hit+=p*survives;results[second].success[secondSL]+=p*survives;
-      recordDamage(results[second],damage[second][secondSL],p*survives,potential[second][secondSL]);
-    } else results[second].damage[0]+=p*survives;
+    const one=event(first,s),two=event(second,s);
+    if(one&&two&&one.source===two.source){
+      // Counterstrike plus that model's own attack: both are single damage rolls.
+      // Keep their correlation so a lethal first roll cancels the second event.
+      const metric=results[one.source],hp=models[1-one.source].hp;
+      for(const before of one.uncapped){
+        const survives=!before.removed&&before.wounds<hp;
+        const after=survives?two.uncapped:[{wounds:0,removed:false,p:1}];
+        for(const end of after){
+          const weight=p*before.p*end.p,wounds=before.wounds+end.wounds;
+          const outcomes=[{wounds:Math.min(hp,wounds),removed:before.removed||end.removed,p:1}];
+          recordDamage(metric,outcomes,weight,[{wounds,p:1}]);
+          metric.hit+=weight;metric.success[survives?Math.max(one.sl,two.sl):one.sl]+=weight;
+        }
+      }
+    }else{
+      record(one,p);
+      const survives=!one?1:one.prone?0:one.outcomes.filter(o=>!o.removed&&o.wounds<models[1-one.source].hp).reduce((sum,o)=>sum+o.p,0);
+      record(two,p*survives);
+    }
   }
   return {mode:'melee',first,models,results:results.map(finish)};
 }
@@ -300,7 +324,7 @@ export function ranged(input) {
     [target,friendly].forEach((defender,i)=>{
       const p=state.p*(i===0 ? selection:1-selection);
       results[i].hit+=p;results[i].success[sl]+=p;
-      recordDamage(results[i],damageOutcomes(sl,attacker,defender),p,uncappedMean(sl,attacker,defender));
+      recordDamage(results[i],damageOutcomes(sl,attacker,defender),p,damageOutcomes(sl,attacker,{...defender,hp:Infinity}));
     });
   }
   results.forEach(r=>r.damage[0]+=1-r.hit);
