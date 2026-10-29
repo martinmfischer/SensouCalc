@@ -1,0 +1,16 @@
+{
+  "id": "./",
+  "name": "Sensou Calc — Bushido Dice Lab",
+  "short_name": "Sensou Calc",
+  "description": "Exact Bushido: Risen Sun probabilities, even offline.",
+  "lang": "en",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#f5f6f0",
+  "theme_color": "#204b40",
+  "icons": [
+    {"src":"./assets/icon-192.png","sizes":"192x192","type":"image/png","purpose":"any"},
+    {"src":"./assets/icon-512.png","sizes":"512x512","type":"image/png","purpose":"any maskable"}
+  ]
+}
