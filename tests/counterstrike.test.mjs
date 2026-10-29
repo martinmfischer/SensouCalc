@@ -17,9 +17,9 @@ test('Counterstrike needs allocated Attack and Defence dice; natural ones still 
   close(noDefence.results[1].hit,0);
 });
 
-test('Counterstrike exchanges match independent ordered pools and damage rolls, including lethal interruption',()=>{
-  for(const both of [false,true])for(const active of [0,1]){
-    const models=[model({attack:1,defence:1,hp:2,special:both?'counterstrike':'normal',strength:1}),model({attack:1,defence:1,hp:4,special:'counterstrike',tough:1})];
+test('Counterstrike exchanges match independent ordered pools and damage rolls, including Last Stand',()=>{
+  for(const both of [false,true])for(const active of [0,1])for(const [lastA,lastB] of [[false,false],[true,false],[false,true],[true,true]]){
+    const models=[model({attack:1,defence:1,hp:2,special:both?'counterstrike':'normal',strength:1,lastStand:lastA}),model({attack:1,defence:1,hp:4,special:'counterstrike',tough:1,lastStand:lastB})];
     const expected=models.map((_,i)=>({hit:0,kill:0,damage:Array(models[1-i].hp+1).fill(0),wounds:[]}));
     function event(i,pools){
       const j=1-i,win=pools[i].attack>pools[j].defence||(pools[i].attack===pools[j].defence&&(pools[i].count>pools[j].count||pools[i].count===pools[j].count&&active===i));
@@ -40,7 +40,7 @@ test('Counterstrike exchanges match independent ordered pools and damage rolls, 
       const pools=[[aa,ad],[ba,bd]].map(([a,d])=>({attack:a===1?0:a,defence:d===1?0:d,count:Number(a>1)+Number(d>1)}));
       const one=event(active,pools),two=event(1-active,pools);
       for(const first of rolls(one)){
-        const alive=!one||first.wounds<models[1-one.source].hp;
+        const alive=!one||first.wounds<models[1-one.source].hp||models[1-one.source].lastStand;
         const next=alive?two:null;
         for(const second of rolls(next)){
           const weight=first.p*second.p/1296,totals=[0,0],hits=[false,false];
