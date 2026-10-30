@@ -3,7 +3,7 @@ import {createServer} from 'node:http';
 import {readFile,stat,realpath} from 'node:fs/promises';
 import {resolve,extname,sep,relative} from 'node:path';
 const root=resolve(import.meta.dirname,'..');
-const types={'.html':'text/html; charset=utf-8','.css':'text/css; charset=utf-8','.mjs':'text/javascript; charset=utf-8','.js':'text/javascript; charset=utf-8','.json':'application/json','.webmanifest':'application/manifest+json','.svg':'image/svg+xml','.png':'image/png','.woff2':'font/woff2'};
+const types={'.txt':'text/plain; charset=utf-8','.html':'text/html; charset=utf-8','.css':'text/css; charset=utf-8','.mjs':'text/javascript; charset=utf-8','.js':'text/javascript; charset=utf-8','.json':'application/json','.webmanifest':'application/manifest+json','.svg':'image/svg+xml','.png':'image/png','.woff2':'font/woff2'};
 const securityHeaders=Object.fromEntries((await readFile(resolve(root,'_headers'),'utf8')).split('\n').filter(line=>/^\s+[\w-]+:/.test(line)).map(line=>{const at=line.indexOf(':');return [line.slice(0,at).trim(),line.slice(at+1).trim()];}));
 const port=Number(process.env.PORT)||4173;
 createServer(async(req,res)=>{

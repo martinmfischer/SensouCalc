@@ -15,11 +15,11 @@ export function calculationInput(state){
   return input;
 }
 
-export const defaults=()=>({version:1,advanced:true,mode:'melee',active:0,a:defaultModel('Model A'),b:defaultModel('Model B'),friendly:defaultModel('Friendly model'),range:4,challengeModifier:0,rangedDefence:0,inBtb:false,conditions:{}});
+export const defaults=()=>({version:1,advanced:false,mode:'melee',active:0,a:defaultModel('Model A'),b:defaultModel('Model B'),friendly:defaultModel('Friendly model'),range:4,challengeModifier:0,rangedDefence:0,inBtb:false,conditions:{}});
 export function sanitize(value) {
   if (!value || typeof value!=='object') throw new Error('Invalid scenario');
   const result=defaults();
-  result.advanced=value.advanced!==false;result.mode=value.mode==='ranged'?'ranged':'melee';result.active=value.active===1?1:0;
+  result.advanced=value.advanced===true;result.mode=value.mode==='ranged'?'ranged':'melee';result.active=value.active===1?1:0;
   const legacyNames={'Modell A':'Model A','Modell B':'Model B','Befreundetes Modell':'Friendly model'};
   for (const key of ['a','b','friendly']) {result[key]=normalizeModel(value[key]||result[key]);if(Object.hasOwn(legacyNames,result[key].name))result[key].name=legacyNames[result[key].name];result[key].critical=false;result[key].reachEligible=true;}
   result.range=[4,5,6].includes(Number(value.range))?Number(value.range):4;

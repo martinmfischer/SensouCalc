@@ -24,8 +24,17 @@ Sources checked 30 October 2026:
 
 ## Account setup status — 30 October 2026
 
-AdSense opens the Google sign-in page in the current browser; no publisher account or public ad identifiers were available during preparation. The user is completing sign-in. The intended site is `https://sensoucalc.pages.dev/`; the public privacy URL is `https://sensoucalc.pages.dev/privacy.html`. No Google account was created, terms accepted, publisher identifiers invented or advertising enabled.
+The signed-in account supplied publisher ID `ca-pub-3641047527711845`. SensouCalc was added separately from SensouTrack. Google confirmed ownership of `sensoucalc.pages.dev` using the live meta tag, and a site review was requested. The final UI showed **Wird vorbereitet / Überprüfung angefordert**. This is pending Google approval, not permission to serve ads.
 
-Once access is available, add the exact site in AdSense, obtain its supplied ownership-verification instructions and seller entry, and create one responsive horizontal Display unit named `Sensou Calc — below calculator`. Keep auto ads, overlays, anchor ads and interstitials off to preserve the requested placement. Check site approval and configure Google-certified consent handling before activation. Public client/slot values belong in `ads-config.mjs`; no Google passwords or API tokens belong in source.
+Completed:
 
-The Privacy page currently describes local scenario storage, offline cache, shared links, Cloudflare hosting and disabled advertising. It must be updated to match the actual advertising/CMP setup when that setup is known.
+- Ownership meta tag on the calculator and privacy page.
+- Actual authorized seller entry in public `/ads.txt`, included in the build and preview route whitelist.
+- Responsive Display unit **Sensou Calc — below calculator**, slot `1560433528`. The existing app placement constrains it to horizontal; Google's horizontal selector is only a preview.
+- Public client/slot IDs recorded in `ads-config.mjs`, with `enabled: false`.
+- Automatic ads and automatic optimization disabled for SensouCalc; SensouTrack settings left unchanged.
+- Separate Google EU consent draft **Sensou Calc - EU consent**, assigned only to SensouCalc, English, with Consent / Do not consent / Manage options. Decline is enabled for all offered European countries; the optional logo and consent-message optimization are off. Site name and `https://sensoucalc.pages.dev/privacy.html` are set. The draft is **not published**.
+
+Remaining before actual activation: Google site approval; review of the consent draft's actual purposes/partners and publication; response-specific nonces and advertising-compatible CSP; a real CMP-to-ad-loader integration and consent-revocation link; updated privacy text matching the live advertising setup. Test consent, rejection, withdrawal, offline behaviour and the one-slot layout together. Cloudflare Pages supports a `_worker.js` with dashboard uploads, so response-specific nonces can be added while keeping the existing `.pages.dev` address; the deleted legacy Worker endpoint is not needed. The current static site loads no Google scripts or ads. Approval does not automatically enable advertising.
+
+The account payment profile was already marked complete. No payment details or new contract acceptance were needed or changed. No credentials were placed in the repository.

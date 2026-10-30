@@ -102,6 +102,7 @@ const calculator=createCalculator({
   onError:calculationError
 });
 function calculate(){
+  resetAllocations();
   resetSimulation();
   result=null;hideChartTooltip();setBusy(true);$('#calculation-state').textContent='Calculating…';
   calculator.calculate(calculationInput(state));
@@ -123,6 +124,34 @@ $('#simulate-button').onclick=()=>{
   $('#simulate-button').disabled=true;$('#simulation-result').textContent='Rolling…';roller.calculate(calculationInput(state),'simulate');
 };
 $('#roll-range').onchange=event=>{state.range=Number(event.target.value);persist();resetSimulation();};
+let allocationResult=null;
+function renderAllocations(comparison){
+  allocationResult=comparison;$('#allocation-button').disabled=false;$('#allocation-results').setAttribute('aria-busy','false');
+  const side=comparison.side,model=state[side?'b':'a'],enemy=state[side?'a':'b'];
+  $('#allocation-results').innerHTML='<p class="allocation-caption">'+escape(model.name)+' → '+escape(enemy.name)+'</p><div class="table-scroll"><table class="allocation-table"><thead><tr><th>Attack / Defence</th><th>Avg wounds dealt</th><th>Target removed</th><th>Avg wounds taken</th><th>Own removal</th><th><span class="sr-only">Apply allocation</span></th></tr></thead><tbody>'+comparison.rows.map(row=>'<tr'+(model.attack===row.attack&&model.defence===row.defence?' class="current-allocation"':'')+'><th scope="row"><span class="allocation-attack">'+row.attack+'</span> / <span class="allocation-defence">'+row.defence+'</span></th><td>'+decimal(row.outgoing.meanWounds)+'</td><td>'+pct(row.outgoing.kill)+'</td><td>'+decimal(row.incoming.meanWounds)+'</td><td>'+pct(row.incoming.kill)+'</td><td><button type="button" class="inline-button" data-allocation-attack="'+row.attack+'" aria-label="Apply '+row.attack+' Attack and '+row.defence+' Defence">Apply</button></td></tr>').join('')+'</tbody></table></div><p class="input-footnote">Averages include misses and are uncapped. Removal includes Critical; with Last Stand, lethal wounds remove at turn end.</p>';
+}
+const allocationCalculator=createCalculator({onResult:renderAllocations,onError:message=>{
+  allocationResult=null;$('#allocation-button').disabled=false;$('#allocation-results').setAttribute('aria-busy','false');$('#allocation-results').textContent=message;
+}});
+function resetAllocations(){
+  allocationCalculator.dispose();allocationResult=null;$('#allocation-button').disabled=false;
+  $('#allocation-panel').hidden=state.mode!=='melee';$('#allocation-results').textContent='';$('#allocation-results').setAttribute('aria-busy','false');
+  const selected=$('#allocation-side').value==='1'?1:0;
+  $('#allocation-side').innerHTML=[state.a,state.b].map((model,i)=>'<option value="'+i+'"'+(i===selected?' selected':'')+'>'+escape(model.name)+'</option>').join('');
+  const model=state[selected?'b':'a'];$('#allocation-total').value=model.attack+model.defence;
+}
+$('#allocation-side').onchange=resetAllocations;
+$('#allocation-total').oninput=()=>{allocationCalculator.dispose();allocationResult=null;$('#allocation-button').disabled=false;$('#allocation-results').textContent='';$('#allocation-results').setAttribute('aria-busy','false');};
+$('#allocation-form').onsubmit=event=>{
+  event.preventDefault();allocationResult=null;$('#allocation-button').disabled=true;$('#allocation-results').textContent='Comparing…';$('#allocation-results').setAttribute('aria-busy','true');
+  allocationCalculator.calculate({...calculationInput(state),allocationSide:Number($('#allocation-side').value),allocationTotal:Number($('#allocation-total').value)},'allocations');
+};
+$('#allocation-results').onclick=event=>{
+  const button=event.target.closest('[data-allocation-attack]');if(!button||!allocationResult)return;
+  const attack=Number(button.dataset.allocationAttack),row=allocationResult.rows.find(row=>row.attack===attack);if(!row)return;
+  const comparison=allocationResult,key=comparison.side?'b':'a';state[key]={...state[key],attack:row.attack,defence:row.defence};renderModels();change();renderAllocations(comparison);toast('Allocation applied.');
+};
+$('#allocation-panel').ontoggle=()=>{if(!$('#allocation-panel').open){allocationCalculator.dispose();$('#allocation-button').disabled=false;$('#allocation-results').setAttribute('aria-busy','false');if(!allocationResult)$('#allocation-results').textContent='';}};
 function legendNames(){return state.mode==='melee'?[state.a.name,state.b.name]:['Short','Medium','Long'];}
 function damageViewSwitch(){
   return '<div class="damage-view-switch" role="group" aria-label="Damage summary"><span>Damage / HP</span>'+['average','median'].map(view=>'<button data-damage-view="'+view+'" aria-pressed="'+(damageView===view)+'">'+(view==='average'?'Average':'Median')+'</button>').join('')+'</div>';

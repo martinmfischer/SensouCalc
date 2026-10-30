@@ -37,6 +37,8 @@ Build with `node scripts/build.mjs`. With Cloudflare Wrangler installed and auth
 
 ## Calculator modes and saved scenarios
 
+First visits and Reset start in Basic. An explicitly saved Basic/Advanced mode is restored on reopening; scenario/share-link choices are also preserved.
+
 Basic hides Impenetrable Defence, model size, Adept, Sharp, Unblockable, Tough, Pierce, Armour, shared Melee Prowess and its priority, initiative traits, Durable, Last Stand, Kata, damage dice selection and special abilities. Hidden values stay in the complete profiles but are neutralized in the derived calculation input. Advanced restores them. In Ranged Basic, Friendly Fire, Ranged Defence and the detailed condition checkboxes are also ignored. Enter their combined modifier (including target size) in Challenge Modifier; its range is −20 to +20. Mode is preserved in saved scenarios, reload persistence and share links. Additional Critical and the separate Reach eligibility control are no longer shown; enable Reach only when it applies.
 
 Average and lower-median wounds are uncapped in both Melee and Ranged. Average HP rings use the capped mean actual HP loss to show expected remaining HP; median rings use the lower median. Uncapped Average wounds remains separate. Rings do not show outcome probabilities, and Critical removal is reported separately. The out-of-action percentage and HP-loss plots remain based on actual remaining HP. Swap exchanges both complete profiles while keeping the active side fixed.
@@ -87,7 +89,11 @@ Last Stand is Advanced-only: lethal wounds do not cancel a counterattack or othe
 
 See [technical review](docs/SECURITY-REVIEW.md) for concrete findings, fixes and verification. `_headers` enforces a same-origin script CSP and framing/MIME/referrer protections. CSV export neutralizes formula prefixes after ignored whitespace; scenario parsing is bounded and handles share-link hash changes. Superseded calculations are cancelled and a 20-second deadline prevents an unbounded background queue.
 
-A single inactive AdSense slot is reserved below the plots. Preview it with `?previewAds=1`; no Google requests are made. Activation requirements and the CSP/CMP boundary are documented in [ADSENSE.md](docs/ADSENSE.md). Publisher and ad-unit IDs are blank; `ads.txt.example` is intentionally not published.
+A single inactive AdSense slot is reserved below the plots. Preview it with `?previewAds=1`; no Google requests are made. Activation requirements and the CSP/CMP boundary are documented in [ADSENSE.md](docs/ADSENSE.md). Actual public publisher/ad-unit IDs are configured, but ad loading stays disabled pending Google site approval and consent/CSP integration. The live meta tag and `ads.txt` verify ownership and the authorized seller.
+
+## Compare melee allocations
+
+The compact **Compare allocations** section is closed until requested, directly above the single-roll panel. Choose either model and a fixed total after costs (0–16, at most 8 per pool). Compare every split against the unchanged enemy: uncapped average wounds dealt/taken and both removal chances. Apply changes only the selected model’s Attack/Defence allocation. Active Player, HP, traits, hidden Advanced values and reroll policy stay fixed. No tactic is declared universally best; special-ability costs are still manual. Comparison runs in a cancellable worker with the same timeout as ordinary calculations. Shared Melee Prowess retains its eight-total-dice limit. Ranged mode hides this melee-only section.
 
 ## Interactive single-run dice
 

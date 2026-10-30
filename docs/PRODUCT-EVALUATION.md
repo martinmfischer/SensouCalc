@@ -112,3 +112,11 @@ This pass did not exhaust all 8-dice/3-reroll combinations, perform a full acces
 5. Activate advertising only after account/site/consent/CSP setup is complete and verified together.
 
 Keep the current lightweight deployment and separate DOM-independent engine for later SensouTrack integration. A server database is not needed for those improvements unless cross-device account sync becomes an actual requirement.
+
+## Implemented follow-up — 30 October 2026
+
+Attack/Defence allocation comparison is now a compact, initially closed inline section, as requested. It compares a fixed total for either model against the unchanged opponent, using existing exact rules and reroll strategies. Results show uncapped average wounds dealt/taken and removal chances in both directions. Apply changes only the selected allocation. Costs remain manual; there is no new tactical optimiser or extra permanent dashboard.
+
+Basic is now the first-visit and reset default. Saved explicit Basic/Advanced choices survive reopening, and complete scenario links retain their mode. The follow-up includes exact row-to-engine regression checks and browser checks for first visit, both remembered choices, comparing/applying both models, and hiding the section in Ranged.
+
+AdSense ownership was confirmed and the site entered Google review. Public seller metadata and a manual display unit are configured, Auto ads/optimization are off, and a separate EU consent draft is saved. Advertising remains disabled pending approval and completed consent/CSP integration. See ADSENSE.md for the current activation boundary.
