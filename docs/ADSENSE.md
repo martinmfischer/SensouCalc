@@ -21,3 +21,11 @@ Sources checked 30 October 2026:
 - [AdSense CSP requirements](https://support.google.com/adsense/answer/16283098?hl=en-GB)
 - [Certified CMP requirements](https://support.google.com/adsense/answer/13554116?hl=en-GB)
 - [ads.txt setup](https://support.google.com/adsense/answer/12171612?hl=en)
+
+## Account setup status — 30 October 2026
+
+AdSense opens the Google sign-in page in the current browser; no publisher account or public ad identifiers were available during preparation. The user is completing sign-in. The intended site is `https://sensoucalc.pages.dev/`; the public privacy URL is `https://sensoucalc.pages.dev/privacy.html`. No Google account was created, terms accepted, publisher identifiers invented or advertising enabled.
+
+Once access is available, add the exact site in AdSense, obtain its supplied ownership-verification instructions and seller entry, and create one responsive horizontal Display unit named `Sensou Calc — below calculator`. Keep auto ads, overlays, anchor ads and interstitials off to preserve the requested placement. Check site approval and configure Google-certified consent handling before activation. Public client/slot values belong in `ads-config.mjs`; no Google passwords or API tokens belong in source.
+
+The Privacy page currently describes local scenario storage, offline cache, shared links, Cloudflare hosting and disabled advertising. It must be updated to match the actual advertising/CMP setup when that setup is known.

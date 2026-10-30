@@ -1,5 +1,5 @@
 const CACHE='sensou-calc-v10';
-const ASSETS=['./','./index.html','./styles.css','./app.mjs','./src/engine.mjs','./src/simulator.mjs','./src/worker.mjs','./src/scenario.mjs','./src/export.mjs','./src/calculator.mjs','./src/ads.mjs','./ads-config.mjs','./manifest.webmanifest','./assets/icon.svg','./assets/icon-192.png','./assets/icon-512.png','./assets/dm-sans.woff2','./assets/manrope.woff2'];
+const ASSETS=['./','./index.html','./privacy.html','./styles.css','./app.mjs','./src/engine.mjs','./src/simulator.mjs','./src/worker.mjs','./src/scenario.mjs','./src/export.mjs','./src/calculator.mjs','./src/ads.mjs','./ads-config.mjs','./manifest.webmanifest','./assets/icon.svg','./assets/icon-192.png','./assets/icon-512.png','./assets/dm-sans.woff2','./assets/manrope.woff2'];
 self.addEventListener('install',event=>event.waitUntil(caches.open(CACHE).then(cache=>cache.addAll(ASSETS))));
 self.addEventListener('activate',event=>event.waitUntil(Promise.all([caches.keys().then(keys=>Promise.all(keys.filter(k=>k.startsWith('sensou-calc-')&&k!==CACHE).map(k=>caches.delete(k)))),self.clients.claim()])));
 self.addEventListener('fetch',event=>{

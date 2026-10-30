@@ -188,7 +188,7 @@ function renderChart() {
     }
   } else {
     const groupWidth=pw/(maxX+1),barWidth=Math.min(28,groupWidth/(series.length+1));
-    series.forEach((values,i)=>values.forEach((p,n)=>{svg+=`<rect x="${x(n)+(i-(series.length-1)/2)*barWidth-barWidth/2}" y="${y(p)}" width="${barWidth-2}" height="${Math.max(0,ph*p)}" rx="2" fill="${colors[i]}" opacity="${i?.75:1}"><title>${escape(names[i])}: ${plot==='success'?'SL':'HP'} ${n}: ${pct(p)}</title></rect>`;}));
+    series.forEach((values,i)=>values.forEach((p,n)=>{svg+=`<rect x="${x(n)+(i-(series.length-1)/2)*barWidth-barWidth/2}" y="${y(p)}" width="${Math.max(.5,barWidth-2)}" height="${Math.max(0,ph*p)}" rx="2" fill="${colors[i]}" opacity="${i?.75:1}"><title>${escape(names[i])}: ${plot==='success'?'SL':'HP'} ${n}: ${pct(p)}</title></rect>`;}));
   }
   $('#chart').innerHTML=svg+'</svg><div id="chart-tooltip" class="chart-tooltip" role="tooltip" hidden></div>';
   $('#threshold-control').hidden=plot!=='cumulative';

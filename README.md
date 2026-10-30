@@ -21,9 +21,9 @@ The build copies the production files to `dist/`, with a content-derived service
 
 ## Deployment
 
-Primary URL: https://sensoucalc.pages.dev/ — Cloudflare Pages, static assets only. The earlier https://sensoucalc.the-zj.workers.dev/ deployment remains available and has its own browser storage. Saved scenarios are origin-specific; use Share links to transfer individual scenarios between domains. No Supabase, server-side database or runtime secrets are needed.
+Primary URL: https://sensoucalc.pages.dev/ — Cloudflare Pages, static assets only. The former sensoucalc.the-zj.workers.dev Worker was deleted on 30 October 2026. Saved scenarios are origin-specific; use Share links to transfer scenarios to this domain. No Supabase, server-side database or runtime secrets are needed.
 
-Build with `node scripts/build.mjs`. With Cloudflare Wrangler installed and authenticated, deploy using `npx wrangler pages deploy dist --project-name sensoucalc`. `wrangler.jsonc` declares Pages output. Alternatively zip the contents of `dist/` (including `_headers` and with `index.html` at the archive root), then upload to Cloudflare Pages → sensoucalc → Create deployment. Git auto-deployment is not connected. The legacy Worker configuration is retained as `wrangler.worker.jsonc`; build and use `npx wrangler deploy --config wrangler.worker.jsonc` to update that endpoint. Never commit credentials or API tokens.
+Build with `node scripts/build.mjs`. With Cloudflare Wrangler installed and authenticated, deploy using `npx wrangler pages deploy dist --project-name sensoucalc`. `wrangler.jsonc` declares Pages output. Alternatively zip the contents of `dist/` (including `_headers` and with `index.html` at the archive root), then upload to Cloudflare Pages → sensoucalc → Create deployment. Git auto-deployment is not connected. Never commit credentials or API tokens.
 
 ## Features
 
@@ -33,13 +33,13 @@ Build with `node scripts/build.mjs`. With Cloudflare Wrangler installed and auth
 - Critical Attack, Dual Attack, Combo Attack, half damage and half damage with Prone interrupting the second attack. Counterstrike Defence is available as an exclusive special ability. Enter dice **after** costs, states, assists and Ki Boosts.
 - Cumulative damage probability `P(wounds ≥ x)`, damage distribution and Success Level distribution, with readable tables, an interactive damage threshold and CSV export.
 - Local scenario storage (up to 30), reload persistence and shareable scenario URLs. Shared links contain the entered model names and values in the URL fragment. Shared links are portable when hosted on an accessible URL.
-- Local fonts and app icons, install manifest and service-worker precache. Once “Offline bereit” appears, the app can be reloaded and used without the server/network. Updates wait until all app windows close.
+- Local fonts and app icons, install manifest and service-worker precache. Once “Offline ready” appears, the app can be reloaded and used without the server/network. Updates wait until all app windows close.
 
 ## Calculator modes and saved scenarios
 
-Basic hides Adept, Sharp, Unblockable, Tough, Pierce, Armour, shared Melee Prowess and its priority, initiative traits, Durable, Last Stand, Kata, damage dice selection and special abilities. Hidden values stay in the complete profiles but are neutralized in the derived calculation input. Advanced restores them. Mode is preserved in saved scenarios, reload persistence and share links. Additional Critical and the separate Reach eligibility control are no longer shown; enable Reach only when it applies.
+Basic hides Impenetrable Defence, model size, Adept, Sharp, Unblockable, Tough, Pierce, Armour, shared Melee Prowess and its priority, initiative traits, Durable, Last Stand, Kata, damage dice selection and special abilities. Hidden values stay in the complete profiles but are neutralized in the derived calculation input. Advanced restores them. In Ranged Basic, Friendly Fire, Ranged Defence and the detailed condition checkboxes are also ignored. Enter their combined modifier (including target size) in Challenge Modifier; its range is −20 to +20. Mode is preserved in saved scenarios, reload persistence and share links. Additional Critical and the separate Reach eligibility control are no longer shown; enable Reach only when it applies.
 
-Average and lower-median wounds are uncapped in both Melee and Ranged. The HP rings switch between those summaries; they show damage versus remaining HP, not outcome probabilities. The out-of-action percentage and HP-loss plots remain based on actual remaining HP. Swap exchanges both complete profiles while keeping the active side fixed.
+Average and lower-median wounds are uncapped in both Melee and Ranged. Average HP rings use the capped mean actual HP loss to show expected remaining HP; median rings use the lower median. Uncapped Average wounds remains separate. Rings do not show outcome probabilities, and Critical removal is reported separately. The out-of-action percentage and HP-loss plots remain based on actual remaining HP. Swap exchanges both complete profiles while keeping the active side fixed.
 
 Scenarios support save, load and delete, including names, hidden traits, mode and conditions, for up to 30 saved matchups per browser. They persist offline and across reloads. There is no account or device synchronization. Share links transfer a complete scenario to another browser, but local saved scenarios do not automatically migrate from localhost to the deployment domain.
 
@@ -89,11 +89,17 @@ See [technical review](docs/SECURITY-REVIEW.md) for concrete findings, fixes and
 
 A single inactive AdSense slot is reserved below the plots. Preview it with `?previewAds=1`; no Google requests are made. Activation requirements and the CSP/CMP boundary are documented in [ADSENSE.md](docs/ADSENSE.md). Publisher and ad-unit IDs are blank; `ads.txt.example` is intentionally not published.
 
+## Interactive single-run dice
+
+“Simulate 1 run” / “Roll again” rolls actual D6s using cryptographic rejection sampling, displaying initial pools, chosen rerolls, final kept dice, challenge results, damage rolls and final HP. Ranged simulation has a range selector; all three statistical bands stay visible. Changing any scenario input cancels and clears an obsolete roll. Single runs use the same documented reroll policies as the exact calculation, including shared Melee Prowess with opposing Feint/Dodge. They resolve real remaining HP, Counterstrike, Critical, Prone, Last Stand and Friendly Fire, rather than sampling independent marginal damage distributions.
+
 ## Simulation verification
 
 Run `npm run verify` for a reproducible, independent Monte Carlo comparison against the exact engine: 18 scenarios with 300,000 trials each (5.4 million attacks/exchanges). Use `npm run verify -- 100000` to change the trial count per scenario. Reports are written to `artifacts/simulation-verification.md` and `.json`, including seeds, the engine hash, exact/simulated metrics and tolerances.
 
 The simulator independently rolls ordered D6s, selects rerolls and damage dice, and applies the printed wound table. It compares every damage bucket and cumulative tail, hit/wound/removal/out-of-action chances, mean HP loss and Friendly Fire. Shared Melee Prowess simulation covers two priorities without simultaneous enemy Feint/Dodge; exact unit checks cover those combined policies. Passing is a statistical regression check for the tested profiles and strategies, not a proof of every rules combination.
+
+Run `node scripts/monkey.mjs` for 300 seeded random scenarios and 3,600 single-run simulations, validating probability mass, bounds, saved-state isolation and legal dice/HP results. See [product evaluation](docs/PRODUCT-EVALUATION.md) for UI testing evidence, limitations and prioritized recommendations.
 
 Cumulative damage plots show exact percentages at each threshold on hover, tap or keyboard focus. Use Left/Right, Home/End and Escape to navigate or dismiss the tooltip.
 
