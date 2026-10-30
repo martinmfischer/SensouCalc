@@ -1,6 +1,6 @@
 import {defaultModel,normalizeModel} from './engine.mjs';
 
-export const ADVANCED_FIELDS=new Set(['adeptAttack','adeptDefence','sharp','unblockable','tough','pierce','armour','prowessMelee','rerollGoal','reach','lightning','slow','durable','lastStand','kata','power','special']);
+export const ADVANCED_FIELDS=new Set(['adeptAttack','adeptDefence','sharp','unblockable','impenetrable','size','tough','pierce','armour','prowessMelee','rerollGoal','reach','lightning','slow','durable','lastStand','kata','power','special']);
 
 // Derive calculation inputs without changing the saved complete profiles.
 export function calculationInput(state){
@@ -11,6 +11,7 @@ export function calculationInput(state){
     input[side].reachEligible=true;
     if(state.advanced===false)for(const key of ADVANCED_FIELDS)input[side][key]=neutral[key];
   }
+  if(state.advanced===false&&input.mode==='ranged'){input.inBtb=false;input.conditions={};input.rangedDefence=0;}
   return input;
 }
 
@@ -22,7 +23,7 @@ export function sanitize(value) {
   const legacyNames={'Modell A':'Model A','Modell B':'Model B','Befreundetes Modell':'Friendly model'};
   for (const key of ['a','b','friendly']) {result[key]=normalizeModel(value[key]||result[key]);if(Object.hasOwn(legacyNames,result[key].name))result[key].name=legacyNames[result[key].name];result[key].critical=false;result[key].reachEligible=true;}
   result.range=[4,5,6].includes(Number(value.range))?Number(value.range):4;
-  for (const key of ['challengeModifier','rangedDefence']) result[key]=Math.max(-6,Math.min(6,Math.round(Number(value[key])||0)));
+  for (const key of ['challengeModifier','rangedDefence']) {const limit=key==='challengeModifier'?20:6;result[key]=Math.max(-limit,Math.min(limit,Math.round(Number(value[key])||0)));}
   result.inBtb=value.inBtb===true;
   for (const key of ['cover','moved','ran','prone','surprised','repeated','shooterBtb']) result.conditions[key]=value.conditions?.[key]===true;
   return result;

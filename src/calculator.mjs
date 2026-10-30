@@ -6,7 +6,7 @@ export function createCalculator({onResult,onError,createWorker=()=>new Worker(n
     worker?.terminate();worker=null;
   }
   return {
-    calculate(input){
+    calculate(input,operation='calculate'){
       const id=++generation,state=structuredClone(input);cancel();
       debounce=schedule(()=>{
         let settled=false;
@@ -21,7 +21,7 @@ export function createCalculator({onResult,onError,createWorker=()=>new Worker(n
           };
           worker.onerror=event=>{event.preventDefault?.();fail('The calculation worker failed. Try a smaller dice or reroll pool.');};
           deadline=schedule(()=>fail('This calculation exceeded 20 seconds. Reduce the dice or opposing rerolls and try again.'),timeout);
-          worker.postMessage({id,state});
+          worker.postMessage({id,state,operation});
         }catch{fail('The calculation worker could not start. Please reload the app.');}
       },100);
     },

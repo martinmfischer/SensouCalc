@@ -1,5 +1,5 @@
 // Rules: GCT Studios Risen Sun live text + JwarRef + FAQ, checked 2026-10-29.
-// No random sampling: weighted dice multisets enumerate every possible outcome.
+// Statistics enumerate weighted dice multisets; interactive roll helpers share their reroll policy.
 export const WOUND_TABLE = [
   [0,0,0,0,1,2,3,4,5,6,7],
   [0,0,0,1,2,3,4,5,6,7,8],
@@ -52,12 +52,10 @@ function selections(counts, limit) {
   return result;
 }
 const poolCache = new Map();
-export function poolDistribution(options={}) {
+function preparePool(options={}) {
   const opts={dice:0,kata:false,adept:0,discard:0,modifier:0,ownRerolls:0,enemyRerolls:0,ownFirst:false,...options};
   if (!Number.isInteger(opts.dice) || opts.dice<0 || opts.dice>8) throw new Error('Dice pools must contain between 0 and 8 dice.');
   for (const key of ['ownRerolls','enemyRerolls']) if (!Number.isInteger(opts[key]) || opts[key]<0 || opts[key]>3) throw new Error('Rerolls must be between 0 and 3.');
-  const cacheKey=JSON.stringify(opts);
-  if (poolCache.has(cacheKey)) return poolCache.get(cacheKey);
   const stages = (opts.ownFirst ? [{n:opts.ownRerolls,max:true},{n:opts.enemyRerolls,max:false}] : [{n:opts.enemyRerolls,max:false},{n:opts.ownRerolls,max:true}]).filter(s=>s.n);
   const memo = new Map();
   // Reroll choices optimize expected final pool score, then surviving dice.
@@ -83,6 +81,11 @@ export function poolDistribution(options={}) {
     memo.set(key,best);
     return best;
   }
+  return {opts,stages,policy};
+}
+export function poolDistribution(options={}) {
+  const {opts,stages,policy}=preparePool(options),cacheKey=JSON.stringify(opts);
+  if(poolCache.has(cacheKey))return poolCache.get(cacheKey);
   const output=new Map();
   function resolve(counts,stage,p) {
     if (stage===stages.length) {
@@ -180,6 +183,45 @@ export function damageDistribution(sl,attacker,defender) {
   for (const outcome of damageOutcomes(sl,attacker,defender)) result[outcome.wounds]+=outcome.p;
   return result;
 }
+
+const diceFromCounts=counts=>counts.flatMap((n,i)=>Array(n).fill(i+1));
+function randomFaces(n,die){
+  return Array.from({length:n},()=>{const value=die();if(!Number.isInteger(value)||value<1||value>6)throw new Error('D6 source returned an invalid face.');return value;});
+}
+function rerollCounts(counts,selected,die){
+  const replacements=randomFaces(sum(selected),die),next=counts.map((n,i)=>n-selected[i]);
+  for(const face of replacements)next[face-1]++;
+  return {counts:next,selected:diceFromCounts(selected),replacements};
+}
+function sampledPoolResult(counts,options){
+  return {counts,...scoreCounts(counts,options),final:diceFromCounts(counts),kept:diceFromCounts(counts).filter(face=>options.kata||face!==1).sort((a,b)=>b-a).slice(options.discard||0)};
+}
+export function samplePool(options,die){
+  const {opts,stages,policy}=preparePool(options),counts=opts.initialCounts?[...opts.initialCounts]:Array(6).fill(0);
+  if(!opts.initialCounts)for(const face of randomFaces(opts.dice,die))counts[face-1]++;
+  const initial=diceFromCounts(counts),steps=[];let current=counts;
+  for(let stage=0;stage<stages.length;stage++){
+    const {selected}=policy(current,stage);if(!sum(selected))continue;
+    const roll=rerollCounts(current,selected,die);current=roll.counts;
+    steps.push({owner:stages[stage].max,selected:roll.selected,replacements:roll.replacements,after:diceFromCounts(current)});
+  }
+  return {initial,steps,...sampledPoolResult(current,opts)};
+}
+export function sampleMeleeSide(model,enemy,first,die){
+  const common={kata:model.kata,ownFirst:!first};
+  const options=[{...common,dice:model.attack,modifier:model.brutal,adept:model.adeptAttack,discard:enemy.impenetrable?1:0,ownRerolls:model.prowessAttack,enemyRerolls:enemy.dodge},{...common,dice:model.defence,modifier:model.parry,adept:model.adeptDefence,discard:enemy.unblockable,ownRerolls:model.prowessDefence,enemyRerolls:enemy.feint}];
+  const pools=options.map(option=>samplePool(model.prowessMelee?{...option,ownRerolls:0,enemyRerolls:first?option.enemyRerolls:0}:option,die));
+  if(model.prowessMelee){
+    const selected=sharedProwess(model,...options,first,pools.map(pool=>pool.counts));
+    pools.forEach((pool,i)=>{
+      const roll=rerollCounts(pool.counts,selected[i],die);
+      if(roll.selected.length)pool.steps.push({owner:true,label:'Prowess [Melee]',selected:roll.selected,replacements:roll.replacements,after:diceFromCounts(roll.counts)});
+      const after=samplePool({...options[i],initialCounts:roll.counts,ownRerolls:0,enemyRerolls:first?0:options[i].enemyRerolls},die);
+      pool.steps.push(...after.steps);Object.assign(pool,sampledPoolResult(after.counts,options[i]));
+    });
+  }
+  return {attack:pools[0].score,defence:pools[1].score,count:pools[0].count+pools[1].count,pools:pools.map((pool,i)=>({...pool,kind:i===0?'Attack':'Defence'}))};
+}
 function sideStates(model,enemy,first) {
   const common={kata:model.kata,ownFirst:!first};
   const attackOptions={...common,dice:model.attack,modifier:model.brutal,adept:model.adeptAttack,discard:enemy.impenetrable?1:0,ownRerolls:model.prowessAttack,enemyRerolls:enemy.dodge};
@@ -189,14 +231,14 @@ function sideStates(model,enemy,first) {
   const defences=poolDistribution(defenceOptions);
   return attacks.flatMap(a=>defences.map(d=>({attack:a.score,defence:d.score,count:a.count+d.count,p:a.p*d.p})));
 }
-function sharedProwess(model,attackOptions,defenceOptions,first) {
+function sharedProwess(model,attackOptions,defenceOptions,first,sampled=null) {
   if (model.attack+model.defence>8) throw new Error('Prowess [Melee]: maximum 8 dice in total. Please reduce the pools.');
   const budget=model.prowessMelee;
   const weights=model.rerollGoal==='attack' ? [1,1e-4] : model.rerollGoal==='defence' ? [1e-4,1] : [1,1];
-  function prepare(options) {
+  function prepare(options,initial=null) {
     // Opponent's Feint/Dodge uses the documented independent pool policy.
     // The shared owner allocates their budget after seeing both own pools.
-    const seed=poolDistribution({...options,ownRerolls:0,enemyRerolls:first?options.enemyRerolls:0,raw:true});
+    const seed=initial?[{counts:initial,p:1}]:poolDistribution({...options,ownRerolls:0,enemyRerolls:first?options.enemyRerolls:0,raw:true});
     const terminalCache=new Map();
     function terminal(counts) {
       const key=counts.join(',');
@@ -212,18 +254,19 @@ function sharedProwess(model,attackOptions,defenceOptions,first) {
           const p=r.p*end.p;score+=p*end.score;count+=p*end.count;add(outcomes,`${end.score}:${end.count}`,p);
         }
         const value=score+count*1e-7;
-        for (let b=used;b<=budget;b++) if (!choices[b] || value>choices[b].value+1e-12) choices[b]={value,outcomes};
+        for (let b=used;b<=budget;b++) if (!choices[b] || value>choices[b].value+1e-12) choices[b]={value,outcomes,selected};
       }
       return {p:state.p,choices};
     });
   }
-  const attacks=prepare(attackOptions),defences=prepare(defenceOptions),output=new Map();
+  const attacks=prepare(attackOptions,sampled?.[0]),defences=prepare(defenceOptions,sampled?.[1]),output=new Map();
   for (const a of attacks) for (const d of defences) {
     let best=-Infinity,split=0;
     for (let k=0;k<=budget;k++) {
       const value=weights[0]*a.choices[k].value+weights[1]*d.choices[budget-k].value;
       if (value>best+1e-12) {best=value;split=k;}
     }
+    if(sampled)return [a.choices[split].selected,d.choices[budget-split].selected];
     for (const [ak,ap] of a.choices[split].outcomes) for (const [dk,dp] of d.choices[budget-split].outcomes) {
       const [attack,ac]=ak.split(':').map(Number),[defence,dc]=dk.split(':').map(Number);
       add(output,`${attack}:${defence}:${ac+dc}`,a.p*d.p*ap*dp);
