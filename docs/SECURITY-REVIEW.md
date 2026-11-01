@@ -19,7 +19,9 @@ Advanced-only. Lethal wounds preserve subsequent attack events until turn end; C
 
 ## AdSense boundary
 
-The prepared slot is hidden and makes no third-party requests by default. Its client/slot IDs are validated, its SDK URL is fixed, and loading requires online status, a positive CMP signal and a per-response script nonce. Real activation is intentionally pending identifiers, certified consent integration and nonce-based server CSP; see [ADSENSE.md](ADSENSE.md).
+Updated 1 November 2026: the slot is hidden and makes no third-party requests by default while site approval is pending. Public IDs, a Google TCF subscription, withdrawal handling and a Pages HTML nonce function are now implemented; see [ADSENSE.md](ADSENSE.md). The explicit consent preview loads Google's SDK paused, but never requests a slot. Advertising activation is still blocked on site approval and a successful live consent-dialog check.
+
+HTML script execution now uses a fresh nonce and `strict-dynamic`, without `unsafe-eval` or script attributes. Static assets retain the same-origin policy. HTTPS connections, frames and visual resources are allowed in HTML for Google's runtime; trusted third-party SDKs therefore remain a supply-chain/privacy boundary. Header/body nonce coupling and canonical `/privacy` routing have regression checks. CSP is a defence layer, not a substitute for escaping or bounded scenario imports.
 
 ## Existing protections reviewed
 

@@ -1,6 +1,6 @@
 # Sensou Calc
 
-Bushido: Risen Sun calculator in the visual style of SensouTrack. A responsive, installable PWA for browsers, Android and iPhone/iPad. All calculations run on the device, including offline. No account, backend, analytics, external runtime requests or npm dependencies.
+Bushido: Risen Sun calculator in the visual style of SensouTrack. A responsive, installable PWA for browsers, Android and iPhone/iPad. All calculations run on the device, including offline. The calculator needs no account, database or npm dependencies. A small Pages function supplies HTML CSP nonces; optional advertising/consent uses Google requests. No analytics SDK is included.
 
 ## Run locally
 
@@ -17,11 +17,11 @@ node --test tests/*.test.mjs
 node scripts/build.mjs
 ```
 
-The build copies the production files to `dist/`, with a content-derived service-worker cache version. Serve `dist/` through any static HTTPS host. There is no compilation or package installation step. For Android/iOS installation from a phone, deploy to HTTPS; the desktop's loopback URL is not reachable from the phone. Native App Store / Play Store packages are not included in this version.
+The build copies the production files to `dist/`, with a content-derived service-worker cache version. The calculator works on static HTTPS hosts; the advertising nonce function requires Cloudflare Pages. There is no compilation or package installation step. For Android/iOS installation from a phone, deploy to HTTPS; the desktop's loopback URL is not reachable from the phone. Native App Store / Play Store packages are not included in this version.
 
 ## Deployment
 
-Primary URL: https://sensoucalc.pages.dev/ — Cloudflare Pages, static assets only. The former sensoucalc.the-zj.workers.dev Worker was deleted on 30 October 2026. Saved scenarios are origin-specific; use Share links to transfer scenarios to this domain. No Supabase, server-side database or runtime secrets are needed.
+Primary URL: https://sensoucalc.pages.dev/ — Cloudflare Pages, with an HTML-only function supplying fresh CSP nonces. The former sensoucalc.the-zj.workers.dev Worker was deleted on 30 October 2026. Saved scenarios are origin-specific; use Share links to transfer scenarios to this domain. No Supabase, server-side database or runtime secrets are needed.
 
 Build with `node scripts/build.mjs`. With Cloudflare Wrangler installed and authenticated, deploy using `npx wrangler pages deploy dist --project-name sensoucalc`. `wrangler.jsonc` declares Pages output. Alternatively zip the contents of `dist/` (including `_headers` and with `index.html` at the archive root), then upload to Cloudflare Pages → sensoucalc → Create deployment. Git auto-deployment is not connected. Never commit credentials or API tokens.
 
@@ -87,9 +87,11 @@ Last Stand is Advanced-only: lethal wounds do not cancel a counterattack or othe
 
 ## Security and advertising
 
-See [technical review](docs/SECURITY-REVIEW.md) for concrete findings, fixes and verification. `_headers` enforces a same-origin script CSP and framing/MIME/referrer protections. CSV export neutralizes formula prefixes after ignored whitespace; scenario parsing is bounded and handles share-link hash changes. Superseded calculations are cancelled and a 20-second deadline prevents an unbounded background queue.
+See [technical review](docs/SECURITY-REVIEW.md) for concrete findings, fixes and verification. `_headers` protects static responses; `_worker.js` supplies nonce-based HTML CSP and framing/MIME/referrer protections. CSV export neutralizes formula prefixes after ignored whitespace; scenario parsing is bounded and handles share-link hash changes. Superseded calculations are cancelled and a 20-second deadline prevents an unbounded background queue.
 
-A single inactive AdSense slot is reserved below the plots. Preview it with `?previewAds=1`; no Google requests are made. Activation requirements and the CSP/CMP boundary are documented in [ADSENSE.md](docs/ADSENSE.md). Actual public publisher/ad-unit IDs are configured, but ad loading stays disabled pending Google site approval and consent/CSP integration. The live meta tag and `ads.txt` verify ownership and the authorized seller.
+A single AdSense slot sits below the plots and remains disabled pending site approval. `?previewAds=1` shows a local placement placeholder with no Google requests. `?previewConsent=1` tests the published Google consent message with ad requests paused. The actual consent/SDK lifecycle, CSP nonces and revocation control are documented in [ADSENSE.md](docs/ADSENSE.md). Actual public publisher/ad-unit IDs are configured, but ad loading stays disabled pending Google site approval and final live ad verification. The live meta tag and `ads.txt` verify ownership and the authorized seller.
+
+For continuation on another computer, see [project handoff](docs/HANDOFF.md). Git contains the project and technical context; transferring this Codex conversation uses the app's host handoff, separately from cloning the repository.
 
 ## Compare melee allocations
 

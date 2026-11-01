@@ -2,7 +2,7 @@ import {readFile,writeFile,mkdir,copyFile,readdir} from 'node:fs/promises';
 import {resolve,dirname} from 'node:path';
 import {createHash} from 'node:crypto';
 const root=resolve(import.meta.dirname,'..');
-const files=['index.html','privacy.html','ads.txt','styles.css','app.mjs','sw.js','manifest.webmanifest','_headers','ads-config.mjs','src/engine.mjs','src/simulator.mjs','src/allocations.mjs','src/worker.mjs','src/scenario.mjs','src/export.mjs','src/calculator.mjs','src/ads.mjs',...(await readdir(resolve(root,'assets'))).map(name=>'assets/'+name)];
+const files=['_worker.js','_routes.json','index.html','privacy.html','ads.txt','styles.css','app.mjs','sw.js','manifest.webmanifest','_headers','ads-config.mjs','src/engine.mjs','src/simulator.mjs','src/allocations.mjs','src/worker.mjs','src/scenario.mjs','src/export.mjs','src/calculator.mjs','src/ads.mjs','src/privacy.mjs',...(await readdir(resolve(root,'assets'))).map(name=>'assets/'+name)];
 const hash=createHash('sha256');
 for(const file of files) {
   const destination=resolve(root,'dist',file);

@@ -1,40 +1,60 @@
-# AdSense preparation
+# AdSense setup and activation
 
-One horizontal, labelled ad unit sits below the statistics and above the footer, separated from calculator controls. It is neither sticky nor an overlay. Space is reserved only when the slot is activated; offline and unconfigured visitors see no empty advertising panel.
+Status checked 1 November 2026. Primary site: https://sensoucalc.pages.dev/.
 
-Preview with `?previewAds=1`. This displays the placement without an ad request, even if real advertising is later configured. It works offline. Normal visitors see no preview.
+## Account setup
 
-`ads-config.mjs` contains public identifiers only. Advertising remains disabled. `src/ads.mjs` requires all of the following before requesting the fixed Google SDK URL:
+- Publisher: `ca-pub-3641047527711845`; manual responsive Display unit **Sensou Calc — below calculator**, slot `1560433528`. These are public identifiers.
+- Ownership verified and site review requested. AdSense still shows **Wird vorbereitet / Überprüfung angefordert**. Approval is not automatic.
+- `/ads.txt` serves `google.com, pub-3641047527711845, DIRECT, f08c47fec0942fa0` with HTTP 200. Google's last displayed crawl still says **Nicht gefunden** (30 October); recognition is outstanding.
+- Auto ads and automatic optimization are off for SensouCalc. No SensouTrack configuration was changed.
+- **Sensou Calc - EU consent** is published for SensouCalc only, in English, with Consent / Do not consent / Manage options. Its site name and privacy URL are set; optional logo and message optimization are off.
+- The account partner selection was inspected: only Google Advertising Products (GVL 755), no legitimate interest and no optional device fingerprinting. Do not casually change account-wide settings: they are shared with SensouTrack.
+- The payment profile was already complete. No payment details, credentials or new contracts were changed or placed in this repository.
 
-1. `enabled: true`, an actual `ca-pub-` client ID and ad-unit slot ID.
-2. An online browser.
-3. Consent granted by an integrated, Google-certified CMP, through a `sensou:ads-consent` CustomEvent with `detail: {granted: true}`. A false signal hides the unit and reloads if the SDK had already loaded. The CMP must resolve updated consent before granting it again.
-4. A real, unpredictable CSP nonce on the application script, generated separately for each HTML response. The current static deployment intentionally has no nonce and blocks third-party scripts. This is an activation guard, not a working CMP or an active ad deployment.
+## Runtime
 
-Do not simply add Google domains to the current CSP. Google documents nonce-based strict CSP because ad domains change. Before activation, implement response-specific nonces in a Cloudflare Worker, update CSP according to Google's guide, and test the CMP and ad SDK together. Do not use a fixed nonce, disable CSP, or pretend a custom consent toggle is a certified CMP.
+One labelled horizontal unit is below the statistics, away from controls. It is neither sticky nor an overlay; unfilled and offline units are hidden. `ads-config.mjs` deliberately retains **`enabled: false`** while approval and live consent verification are outstanding. Normal visits load no Google software.
 
-Once approved in AdSense, copy the account's actual seller entry into `ads.txt` at the public site root; `ads.txt.example` is a non-published template. Add the real file to the build's explicit public file list. Review the site's privacy information and consent configuration before enabling ads. Domain/site approval is handled by Google, not by this calculator.
+`src/ads.mjs` implements the Google lifecycle rather than accepting a custom DOM consent event:
 
-Sources checked 30 October 2026:
+1. Set `adsbygoogle.pauseAdRequests = 1` before loading the fixed Google SDK URL. The SDK also deploys the published Google consent message.
+2. Subscribe to the TCF API through Google's `CONSENT_API_READY` callback. Unknown, failed, loading and undecided results fail closed.
+3. In GDPR regions require Google vendor 755 consent and purposes 1, 2, 7, 9 and 10, respecting publisher restrictions. Purposes 3 and 4 additionally permit personalized ads; otherwise request non-personalized ads. Legitimate interest does not satisfy this app's gate. Google still evaluates the complete TC string itself.
+4. Request the single slot only when enabled, online, SDK-ready, a real response nonce exists, consent permits it and Global Privacy Control is not asserted. Recalculations and rerolls do not refresh ads.
+5. The footer's **Privacy & cookie settings** button immediately pauses requests and removes an existing ad, then queues Google's revocation message. A stale consent callback cannot resume requests during this flow. Offline and declined consent also hide/remove the slot.
 
-- [Responsive horizontal ad parameters](https://support.google.com/adsense/answer/9183460?hl=en)
-- [AdSense CSP requirements](https://support.google.com/adsense/answer/16283098?hl=en-GB)
-- [Certified CMP requirements](https://support.google.com/adsense/answer/13554116?hl=en-GB)
-- [ads.txt setup](https://support.google.com/adsense/answer/12171612?hl=en)
+The privacy page has the same entry point through `src/privacy.mjs`. There is no analytics SDK. The regional TCF result is used outside GDPR regions; this is not a claim of implementing every jurisdiction's privacy framework.
 
-## Account setup status — 30 October 2026
+## CSP and offline use
 
-The signed-in account supplied publisher ID `ca-pub-3641047527711845`. SensouCalc was added separately from SensouTrack. Google confirmed ownership of `sensoucalc.pages.dev` using the live meta tag, and a site review was requested. The final UI showed **Wird vorbereitet / Überprüfung angefordert**. This is pending Google approval, not permission to serve ads.
+Cloudflare Pages advanced mode (`_worker.js`) generates a random 192-bit nonce separately for every HTML response and puts it in both CSP and script elements. `_routes.json` includes `/`, `/index.html`, `/privacy.html` and its canonical `/privacy` destination. Pages redirects `.html` URLs before serving them; forgetting the extensionless destination bypasses the function.
 
-Completed:
+HTML uses nonce-based `strict-dynamic`, no script attributes, no `unsafe-eval`, no objects, no base elements, denied framing and no form submission. Google descendants may use HTTPS styles, fonts, images, connections and frames. Static responses retain the stricter same-origin `_headers` policy. HTML is `no-store`; conditional validators are removed so a new nonce cannot be paired with an old HTML body. The service worker stores complete HTML/header responses together for offline use. No Google responses are precached.
 
-- Ownership meta tag on the calculator and privacy page.
-- Actual authorized seller entry in public `/ads.txt`, included in the build and preview route whitelist.
-- Responsive Display unit **Sensou Calc — below calculator**, slot `1560433528`. The existing app placement constrains it to horizontal; Google's horizontal selector is only a preview.
-- Public client/slot IDs recorded in `ads-config.mjs`, with `enabled: false`.
-- Automatic ads and automatic optimization disabled for SensouCalc; SensouTrack settings left unchanged.
-- Separate Google EU consent draft **Sensou Calc - EU consent**, assigned only to SensouCalc, English, with Consent / Do not consent / Manage options. Decline is enabled for all offered European countries; the optional logo and consent-message optimization are off. Site name and `https://sensoucalc.pages.dev/privacy.html` are set. The draft is **not published**.
+The Pages function does not recreate the deleted legacy `workers.dev` endpoint. Local static development intentionally has no nonce and cannot activate Google scripts.
 
-Remaining before actual activation: Google site approval; review of the consent draft's actual purposes/partners and publication; response-specific nonces and advertising-compatible CSP; a real CMP-to-ad-loader integration and consent-revocation link; updated privacy text matching the live advertising setup. Test consent, rejection, withdrawal, offline behaviour and the one-slot layout together. Cloudflare Pages supports a `_worker.js` with dashboard uploads, so response-specific nonces can be added while keeping the existing `.pages.dev` address; the deleted legacy Worker endpoint is not needed. The current static site loads no Google scripts or ads. Approval does not automatically enable advertising.
+## Preview and verification
 
-The account payment profile was already marked complete. No payment details or new contract acceptance were needed or changed. No credentials were placed in the repository.
+- `?previewAds=1`: local placement placeholder; no Google requests, including offline.
+- `?previewConsent=1`: real Google SDK and consent flow, **ad requests always paused** even after acceptance. A footer status reports the consent decision. Loading Google's software exposes network metadata and may read existing Google-domain cookies.
+- `?previewConsent=1&fc=alwaysshow&fctype=gdpr`: Google's documented forced consent-message preview on the published site's hostname.
+
+48 Node tests pass. Consent lifecycle tests exercise accepted/declined/unknown consent, required purposes, vendor restrictions, non-personalized requests, preview isolation, GPC, repeated callbacks, withdrawal, stale events and unfilled slots using DOM/API doubles. Edge tests cover fresh nonces, header/body coupling and route coverage.
+
+Live checks confirm the calculator works, the SDK and Funding Choices load without reported CSP errors, requests remain paused, and the ad element stays uninitialized. However, the published Google message did **not** render in the forced preview or after the revocation button. Its actual purposes/partner disclosure and accept/decline/withdraw UI therefore remain unverified. The editor's earlier “0 partners” preview cannot be treated as a verified live disclosure, despite the account's Google-only selection. Do not mark this end-to-end check complete or enable ads until the real message works. Site approval is still pending; the cause of the missing dialog is not established.
+
+## Remaining activation steps
+
+1. Wait for Google site approval and ads.txt recognition. Check the site details for any new actionable rejection; do not repeatedly resubmit a pending review.
+2. Repeat the forced consent preview on the primary domain. Confirm actual Google/purpose disclosure, decline, acceptance and withdrawal, plus no ad initialization in preview. Diagnose any remaining Google configuration issue before activation.
+3. Once those checks pass, change only `enabled` to `true`, build and deploy. Check a normal page view for a single filled unit and no CSP errors; never click your own ads. Test a declined choice, withdrawal and offline behavior again. A filled ad cannot currently be verified.
+
+Sources:
+
+- [Google Privacy & Messaging API and preview parameters](https://developers.google.com/funding-choices/fc-api-docs)
+- [Pause AdSense requests](https://support.google.com/adsense/answer/7670312?hl=en)
+- [AdSense nonce CSP](https://support.google.com/adsense/answer/16283098?hl=en-GB)
+- [Consent revocation](https://support.google.com/adsense/answer/10959060?hl=en-GB)
+- [Connect a site and request review](https://support.google.com/adsense/answer/7584263?hl=en-GB)
+- [Cloudflare Pages advanced mode](https://developers.cloudflare.com/pages/functions/advanced-mode/)
